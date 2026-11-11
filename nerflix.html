@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamFlix - Unlimited Movies & TV Shows</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        netflixRed: '#E50914',
+                        netflixDark: '#141414',
+                        netflixCard: '#181818',
+                        netflixGray: '#2f2f2f',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome & Phosphor Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        /* Custom scrollbar for horizontal carousels */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .row-container:hover .carousel-arrow {
+            opacity: 1;
+        }
+        /* Netflix vignette gradient overlay */
+        .hero-vignette {
+            background: linear-gradient(180deg, rgba(20,20,20,0.5) 0%, rgba(20,20,20,0.2) 40%, rgba(20,20,20,1) 100%),
+                        linear-gradient(90deg, rgba(20,20,20,0.9) 0%, rgba(20,20,20,0.4) 50%, rgba(20,20,20,0.1) 100%);
+        }
+        /* Scale transitions for movie cards */
+        .movie-card {
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.3s ease;
+        }
+        .movie-card:hover {
+            transform: scale(1.08) translateY(-6px);
+            z-index: 40;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+        }
+        /* Modal smooth animation */
+        .modal-animate-in {
+            animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.92) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-netflixDark text-white font-sans antialiased overflow-x-hidden min-h-screen selection:bg-netflixRed selection:text-white">
+
+    <!-- HEADER / NAVIGATION -->
+    <header id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-colors duration-300 px-4 md:px-12 py-3 md:py-4 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+        <div class="flex items-center space-x-4 md:space-x-10">
+            <!-- Brand Logo -->
+            <a href="#" onclick="filterByGenre('All')" class="text-netflixRed font-black text-2xl md:text-3xl tracking-tighter uppercase flex items-center gap-1 group">
+                <i class="fa-solid fa-play text-xs p-1.5 bg-netflixRed text-white rounded-full transition-transform group-hover:scale-110"></i>
+                <span class="tracking-widest drop-shadow-md">STREAMFLIX</span>
+            </a>
+            
+            <!-- Desktop Nav Links -->
+            <nav class="hidden lg:flex items-center space-x-6 text-sm font-medium text-gray-300">
+                <button onclick="filterByGenre('All')" class="nav-link text-white font-semibold hover:text-white transition">Home</button>
+                <button onclick="filterByGenre('TV Shows')" class="nav-link hover:text-gray-400 transition">TV Shows</button>
+                <button onclick="filterByGenre('Movies')" class="nav-link hover:text-gray-400 transition">Movies</button>
+                <button onclick="filterByGenre('Action')" class="nav-link hover:text-gray-400 transition">Action & Sci-Fi</button>
+                <button onclick="filterByGenre('My List')" class="nav-link hover:text-gray-400 transition">My List <span id="myListBadge" class="ml-1 px-1.5 py-0.5 text-xs bg-netflixRed text-white rounded-full hidden">0</span></button>
+            </nav>
+        </div>
+
+        <!-- Right Side Nav Actions -->
+        <div class="flex items-center space-x-3 md:space-x-6">
+            <!-- Search Input Container -->
+            <div class="relative flex items-center">
+                <button id="searchToggleBtn" class="text-white hover:text-gray-300 focus:outline-none p-2 transition">
+                    <i class="fa-solid fa-magnifying-glass text-lg"></i>
+                </button>
+                <input id="searchInput" type="text" placeholder="Titles, genres, actors..." class="w-0 opacity-0 transition-all duration-300 bg-black/80 text-white text-sm border border-gray-600 rounded-full px-4 py-1.5 focus:outline-none focus:border-white focus:w-48 md:focus:w-64 focus:opacity-100 focus:pl-9">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 text-gray-400 text-xs hidden pointer-events-none" id="searchInnerIcon"></i>
+            </div>
+
+            <!-- Notifications Icon with dropdown preview -->
+            <div class="relative group">
+                <button class="text-white hover:text-gray-300 p-2 relative focus:outline-none">
+                    <i class="fa-solid fa-bell text-lg"></i>
+                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-netflixRed rounded-full animate-pulse"></span>
+                </button>
+                <!-- Notification Dropdown -->
+                <div class="absolute right-0 mt-2 w-72 bg-netflixCard border border-netflixGray rounded-md shadow-2xl p-3 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50">
+                    <h4 class="text-xs font-semibold text-gray-400 mb-2 border-b border-netflixGray pb-1">Notifications</h4>
+                    <div class="space-y-2">
+                        <div class="flex gap-2 items-center text-xs hover:bg-netflixGray/40 p-1.5 rounded transition cursor-pointer">
+                            <div class="w-2 h-2 rounded-full bg-netflixRed"></div>
+                            <div>
+                                <p class="font-medium text-white">New Season Available</p>
+                                <p class="text-gray-400 text-[10px]">Cyberpunk 2099 is live now</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Avatar / Dropdown -->
+            <div class="relative group cursor-pointer">
+                <div class="flex items-center space-x-2">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Avatar" class="w-8 h-8 rounded object-cover border border-netflixGray">
+                    <i class="fa-solid fa-caret-down text-xs text-white transition-transform group-hover:rotate-180"></i>
+                </div>
+                <!-- Profile Menu -->
+                <div class="absolute right-0 mt-2 w-48 bg-black/95 border border-netflixGray rounded shadow-2xl py-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200">
+                    <a href="#" class="px-4 py-2 text-xs text-gray-300 hover:bg-netflixGray flex items-center gap-2"><i class="fa-solid fa-user"></i> Account</a>
+                    <a href="#" class="px-4 py-2 text-xs text-gray-300 hover:bg-netflixGray flex items-center gap-2"><i class="fa-solid fa-circle-question"></i> Help Center</a>
+                    <hr class="border-netflixGray my-1">
+                    <a href="#" class="px-4 py-2 text-xs text-gray-300 hover:bg-netflixGray flex items-center gap-2 text-netflixRed"><i class="fa-solid fa-right-from-bracket"></i> Sign out of StreamFlix</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="relative pb-24">
+
+        <!-- HERO BANNER SECTION -->
+        <section id="heroSection" class="relative w-full h-[70vh] md:h-[85vh] flex items-center justify-start text-white overflow-hidden">
+            <!-- Hero Video/Image Background -->
+            <div class="absolute inset-0 z-0">
+                <img id="heroBackdrop" src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=2000&q=80" alt="Hero Movie Backdrop" class="w-full h-full object-cover transition-opacity duration-700">
+                <div class="absolute inset-0 hero-vignette"></div>
+            </div>
+
+            <!-- Hero Text Details -->
+            <div class="relative z-10 max-w-2xl px-4 md:px-12 space-y-3 md:space-y-5 mt-16">
+                <!-- Tag & Badge -->
+                <div class="flex items-center space-x-2">
+                    <span class="bg-netflixRed text-white text-[10px] md:text-xs font-bold px-2 py-0.5 rounded tracking-wider uppercase">N ORIGINAL</span>
+                    <span id="heroMatch" class="text-green-400 font-semibold text-xs md:text-sm">98% Match</span>
+                    <span id="heroRating" class="border border-gray-400 text-gray-300 text-[10px] px-1 rounded">TV-MA</span>
+                </div>
+
+                <h1 id="heroTitle" class="text-3xl md:text-6xl font-extrabold tracking-tight drop-shadow-lg leading-tight">
+                    Interstellar Odyssey
+                </h1>
+
+                <p id="heroDescription" class="text-xs md:text-base text-gray-200 line-clamp-3 md:line-clamp-4 leading-relaxed font-light drop-shadow">
+                    When a wormhole is discovered near Saturn, a team of space explorers embarks on a desperate mission to venture through it and find a new home for humanity before Earth decays into dust.
+                </p>
+
+                <!-- Hero Action Buttons -->
+                <div class="flex items-center space-x-3 pt-2">
+                    <button onclick="playHeroTrailer()" class="flex items-center space-x-2 bg-white hover:bg-gray-200 text-black font-semibold px-5 md:px-7 py-2 md:py-2.5 rounded transition shadow-lg hover:scale-105 active:scale-95">
+                        <i class="fa-solid fa-play text-sm md:text-lg"></i>
+                        <span class="text-xs md:text-sm">Play</span>
+                    </button>
+                    <button id="heroMoreInfoBtn" onclick="openModal(0)" class="flex items-center space-x-2 bg-gray-600/70 hover:bg-gray-600/90 text-white font-semibold px-4 md:px-6 py-2 md:py-2.5 rounded transition backdrop-blur hover:scale-105 active:scale-95">
+                        <i class="fa-solid fa-circle-info text-sm md:text-lg"></i>
+                        <span class="text-xs md:text-sm">More Info</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- GENRE / CATEGORY SEARCH INDICATOR (DYNAMIC) -->
+        <div id="filterCategoryHeader" class="hidden px-4 md:px-12 py-4 flex items-center justify-between border-b border-netflixGray mb-4">
+            <h2 id="activeCategoryTitle" class="text-xl md:text-2xl font-bold text-white">All Titles</h2>
+            <button onclick="filterByGenre('All')" class="text-xs text-netflixRed hover:underline">Clear Filter</button>
+        </div>
+
+        <!-- CAROUSEL ROWS CONTAINER -->
+        <div id="mediaRowsContainer" class="space-y-8 md:space-y-12 -mt-16 md:-mt-24 relative z-20 px-4 md:px-12">
+            <!-- Dynamic rows will be rendered here via JS -->
+        </div>
+
+    </main>
+
+    <!-- MOVIE DETAILS MODAL OVERLAY -->
+    <div id="detailModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md transition-opacity duration-300">
+        <!-- Modal Card -->
+        <div class="relative w-full max-w-4xl max-h-[92vh] bg-netflixCard rounded-xl overflow-hidden shadow-2xl border border-netflixGray overflow-y-auto no-scrollbar modal-animate-in">
+            <!-- Close Button -->
+            <button onclick="closeModal()" class="absolute top-4 right-4 z-30 w-9 h-9 bg-black/70 hover:bg-black rounded-full flex items-center justify-center text-white transition focus:outline-none">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <!-- Modal Backdrop / Trailer Simulation -->
+            <div class="relative w-full h-64 sm:h-96 bg-black">
+                <img id="modalImg" src="" alt="Movie Preview" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-netflixCard via-transparent to-black/40"></div>
+                
+                <!-- Overlay details on top of image -->
+                <div class="absolute bottom-6 left-6 right-6 flex items-end justify-between">
+                    <div>
+                        <h2 id="modalTitle" class="text-2xl sm:text-4xl font-extrabold text-white drop-shadow-md mb-3">Movie Title</h2>
+                        <div class="flex items-center space-x-3">
+                            <button onclick="playModalVideo()" class="flex items-center space-x-2 bg-white hover:bg-gray-200 text-black font-bold px-6 py-2 rounded transition shadow hover:scale-105">
+                                <i class="fa-solid fa-play"></i>
+                                <span>Play</span>
+                            </button>
+                            <button id="modalAddListBtn" onclick="toggleMyListFromModal()" class="w-10 h-10 border border-gray-400 hover:border-white rounded-full flex items-center justify-center text-white bg-black/40 hover:bg-black/60 transition">
+                                <i class="fa-solid fa-plus" id="modalListIcon"></i>
+                            </button>
+                            <button class="w-10 h-10 border border-gray-400 hover:border-white rounded-full flex items-center justify-center text-white bg-black/40 hover:bg-black/60 transition">
+                                <i class="fa-regular fa-thumbs-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Body Details -->
+            <div class="p-6 space-y-6">
+                <!-- Meta stats row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-2 space-y-4">
+                        <div class="flex items-center space-x-3 text-sm">
+                            <span id="modalMatch" class="text-green-400 font-bold">98% Match</span>
+                            <span id="modalYear" class="text-gray-400">2024</span>
+                            <span id="modalRating" class="border border-gray-500 text-gray-300 text-xs px-1 rounded">TV-MA</span>
+                            <span id="modalDuration" class="text-gray-400">2h 15m</span>
+                            <span class="border border-netflixRed text-netflixRed text-[10px] px-1 rounded uppercase font-semibold">HD</span>
+                        </div>
+                        <p id="modalDesc" class="text-gray-300 text-sm sm:text-base leading-relaxed">
+                            Full detailed description of the selected item will appear here.
+                        </p>
+                    </div>
+
+                    <!-- Metadata column -->
+                    <div class="space-y-3 text-xs sm:text-sm text-gray-400 border-t md:border-t-0 md:border-l border-netflixGray pt-4 md:pt-0 md:pl-6">
+                        <div>
+                            <span class="text-gray-500">Cast:</span>
+                            <span id="modalCast" class="text-gray-300">Actor One, Actor Two, Actor Three</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Genres:</span>
+                            <span id="modalGenre" class="text-gray-300">Sci-Fi, Action, Thriller</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">This show is:</span>
+                            <span class="text-gray-300">Mind-Bending, Exciting, Atmospheric</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulating Episodes / Similar Movies -->
+                <div class="border-t border-netflixGray pt-6">
+                    <h3 class="text-lg font-bold text-white mb-4">Episodes & Bonus Content</h3>
+                    <div id="episodesContainer" class="space-y-3">
+                        <!-- Dynamic episodes injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION FOR USER ACTIONS -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 bg-netflixRed text-white text-sm font-semibold px-4 py-3 rounded-lg shadow-2xl flex items-center space-x-3 opacity-0 transform translate-y-4 transition-all duration-300 pointer-events-none">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMessage">Item added to My List</span>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <footer class="max-w-6xl mx-auto px-4 md:px-12 mt-16 text-gray-500 text-xs space-y-4">
+        <div class="flex space-x-6 text-base text-gray-400 mb-4">
+            <a href="#" class="hover:text-white"><i class="fa-brands fa-facebook-f"></i></a>
+            <a href="#" class="hover:text-white"><i class="fa-brands fa-instagram"></i></a>
+            <a href="#" class="hover:text-white"><i class="fa-brands fa-twitter"></i></a>
+            <a href="#" class="hover:text-white"><i class="fa-brands fa-youtube"></i></a>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 leading-loose">
+            <a href="#" class="hover:underline">Audio Description</a>
+            <a href="#" class="hover:underline">Help Center</a>
+            <a href="#" class="hover:underline">Gift Cards</a>
+            <a href="#" class="hover:underline">Media Center</a>
+            <a href="#" class="hover:underline">Investor Relations</a>
+            <a href="#" class="hover:underline">Jobs</a>
+            <a href="#" class="hover:underline">Terms of Use</a>
+            <a href="#" class="hover:underline">Privacy Statement</a>
+        </div>
+        <div class="pt-4">
+            <button class="border border-gray-600 hover:border-white text-gray-400 hover:text-white px-3 py-1 text-xs transition">Service Code</button>
+        </div>
+        <p class="text-[11px] pt-2">© 2026 StreamFlix UI Replica, Inc. Built for high performance and smooth dynamic interactions.</p>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // MOCK MEDIA DATASET
+        const MEDIA_DATABASE = [
+            {
+                id: 0,
+                title: "Interstellar Odyssey",
+                category: "Movies",
+                genre: "Sci-Fi",
+                rating: "TV-MA",
+                match: "98%",
+                year: "2024",
+                duration: "2h 49m",
+                description: "When a mysterious spatial anomaly opens near Saturn, a team of astronaut researchers travels through deep space to locate a sustainable habitat for humanity.",
+                poster: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=1200&q=80",
+                trending: true,
+                popular: true,
+                cast: "Matthew C., Anne H., Jessica C."
+            },
+            {
+                id: 1,
+                title: "Cyberpunk Neo Metropolis",
+                category: "TV Shows",
+                genre: "Action",
+                rating: "TV-MA",
+                match: "95%",
+                year: "2025",
+                duration: "3 Seasons",
+                description: "In a neon-drenched dystopian city where body augmentation is king, a street mercenary undertakes high-stakes heists to bring down mega-corporations.",
+                poster: "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
+                trending: true,
+                popular: true,
+                cast: "Keanu R., Ana D., Idris E."
+            },
+            {
+                id: 2,
+                title: "The Midnight Horizon",
+                category: "Movies",
+                genre: "Drama",
+                rating: "PG-13",
+                match: "92%",
+                year: "2023",
+                duration: "1h 58m",
+                description: "A lone lighthouse keeper on a remote oceanic island uncovers a century-old mystery after a storm washes up an unidentified vessel.",
+                poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=1200&q=80",
+                trending: true,
+                popular: false,
+                cast: "Willem D., Robert P."
+            },
+            {
+                id: 3,
+                title: "Chronicles of Eldoria",
+                category: "TV Shows",
+                genre: "Fantasy",
+                rating: "TV-14",
+                match: "99%",
+                year: "2024",
+                duration: "2 Seasons",
+                description: "Ancient magic reawakens in a fractured realm. A young outcast must unite rival empires before an icy darkness consumes the continent.",
+                poster: "https://images.unsplash.com/photo-1514539079130-25950c84af65?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80",
+                trending: true,
+                popular: true,
+                cast: "Emilia C., Kit H., Peter D."
+            },
+            {
+                id: 4,
+                title: "Apex Predator: Velocity",
+                category: "Movies",
+                genre: "Action",
+                rating: "R",
+                match: "89%",
+                year: "2024",
+                duration: "2h 10m",
+                description: "High-octane underground street racing meets international espionage when an elite driver is forced into a government sting operation.",
+                poster: "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
+                trending: false,
+                popular: true,
+                cast: "Vin D., Paul W., Michelle R."
+            },
+            {
+                id: 5,
+                title: "Quantum Paradox",
+                category: "Movies",
+                genre: "Sci-Fi",
+                rating: "PG-13",
+                match: "96%",
+                year: "2025",
+                duration: "2h 20m",
+                description: "A quantum physicist accidentally opens parallel timelines, creating conflicting realities that threaten to erase existence itself.",
+                poster: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1200&q=80",
+                trending: true,
+                popular: true,
+                cast: "Cillian M., Florence P."
+            },
+            {
+                id: 6,
+                title: "Shadow Syndicate",
+                category: "TV Shows",
+                genre: "Crime",
+                rating: "TV-MA",
+                match: "94%",
+                year: "2023",
+                duration: "4 Seasons",
+                description: "In 1980s London, competing crime families battle for control over shipping docks while an undercover officer infiltrates the inner circle.",
+                poster: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+                trending: false,
+                popular: true,
+                cast: "Tom H., Cillian M."
+            },
+            {
+                id: 7,
+                title: "Sub-Zero Expedition",
+                category: "Movies",
+                genre: "Documentary",
+                rating: "PG",
+                match: "91%",
+                year: "2024",
+                duration: "1h 35m",
+                description: "Witness the unprecedented journey of brave researchers exploring uncharted underwater caverns deep beneath the Antarctic ice shelves.",
+                poster: "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?auto=format&fit=crop&w=600&q=80",
+                backdrop: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80",
+                trending: false,
+                popular: false,
+                cast: "David A., Environmental Team"
+            }
+        ];
+
+        // USER MY-LIST STATE
+        let myListIds = new Set();
+        let activeModalId = null;
+
+        // INITIALIZE APP ON LOAD
+        document.addEventListener("DOMContentLoaded", () => {
+            renderMediaRows(MEDIA_DATABASE);
+            setupSearchFilter();
+            setupNavbarScroll();
+        });
+
+        // NAVBAR SCROLL EFFECT
+        function setupNavbarScroll() {
+            const navbar = document.getElementById('navbar');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 50) {
+                    navbar.classList.add('bg-black');
+                    navbar.classList.remove('bg-gradient-to-b', 'from-black/80', 'via-black/40', 'to-transparent');
+                } else {
+                    navbar.classList.remove('bg-black');
+                    navbar.classList.add('bg-gradient-to-b', 'from-black/80', 'via-black/40', 'to-transparent');
+                }
+            });
+        }
+
+        // RENDER MEDIA CAROUSELS BY CATEGORY
+        function renderMediaRows(dataList) {
+            const container = document.getElementById('mediaRowsContainer');
+            container.innerHTML = '';
+
+            const categories = [
+                { title: "Trending Now", filter: item => item.trending },
+                { title: "Popular on StreamFlix", filter: item => item.popular },
+                { title: "Action & Sci-Fi Thrillers", filter: item => item.genre === 'Sci-Fi' || item.genre === 'Action' },
+                { title: "TV Shows & Series", filter: item => item.category === 'TV Shows' }
+            ];
+
+            if (dataList.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-20 space-y-4">
+                        <i class="fa-solid fa-film text-5xl text-gray-600"></i>
+                        <p class="text-gray-400 text-lg">No titles matched your query.</p>
+                        <button onclick="filterByGenre('All')" class="px-4 py-2 bg-netflixRed text-white rounded font-medium text-sm">View All Titles</button>
+                    </div>
+                `;
+                return;
+            }
+
+            categories.forEach(cat => {
+                const rowItems = dataList.filter(cat.filter);
+                if (rowItems.length === 0) return;
+
+                const rowHtml = document.createElement('div');
+                rowHtml.className = "row-container space-y-3 relative group";
+
+                rowHtml.innerHTML = `
+                    <h3 class="text-lg md:text-xl font-bold text-white tracking-wide hover:text-netflixRed transition cursor-pointer flex items-center gap-2">
+                        ${cat.title}
+                        <i class="fa-solid fa-chevron-right text-xs text-netflixRed opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                    </h3>
+                    
+                    <div class="relative">
+                        <!-- Left Carousel Scroll Button -->
+                        <button onclick="scrollCarousel(this, -1)" class="carousel-arrow absolute left-0 top-0 bottom-0 z-30 bg-black/60 hover:bg-black/90 text-white w-10 flex items-center justify-center opacity-0 transition-opacity rounded-r-md">
+                            <i class="fa-solid fa-chevron-left text-lg"></i>
+                        </button>
+                        
+                        <!-- Scrollable Cards Track -->
+                        <div class="carousel-track flex space-x-3 md:space-x-4 overflow-x-auto no-scrollbar py-4 scroll-smooth px-1">
+                            ${rowItems.map(item => createCardHtml(item)).join('')}
+                        </div>
+
+                        <!-- Right Carousel Scroll Button -->
+                        <button onclick="scrollCarousel(this, 1)" class="carousel-arrow absolute right-0 top-0 bottom-0 z-30 bg-black/60 hover:bg-black/90 text-white w-10 flex items-center justify-center opacity-0 transition-opacity rounded-l-md">
+                            <i class="fa-solid fa-chevron-right text-lg"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(rowHtml);
+            });
+        }
+
+        // CREATE SINGLE CARD HTML TEMPLATE
+        function createCardHtml(item) {
+            const isSaved = myListIds.has(item.id);
+            return `
+                <div class="movie-card flex-none w-40 sm:w-52 md:w-64 bg-netflixCard rounded-lg overflow-hidden cursor-pointer shadow-lg group/card" onclick="openModal(${item.id})">
+                    <!-- Image Poster -->
+                    <div class="relative aspect-video w-full overflow-hidden bg-netflixGray">
+                        <img src="${item.poster}" alt="${item.title}" class="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" loading="lazy">
+                        <div class="absolute top-2 left-2 bg-netflixRed text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">Top 10</div>
+                    </div>
+                    
+                    <!-- Card Quick Details (Visible on hover) -->
+                    <div class="p-3 space-y-2 bg-netflixCard border-t border-netflixGray">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <button onclick="event.stopPropagation(); playModalVideo();" class="w-7 h-7 bg-white hover:bg-gray-200 text-black rounded-full flex items-center justify-center text-xs transition">
+                                    <i class="fa-solid fa-play"></i>
+                                </button>
+                                <button onclick="event.stopPropagation(); toggleMyList(${item.id});" class="w-7 h-7 border border-gray-400 hover:border-white text-white rounded-full flex items-center justify-center text-xs transition">
+                                    <i class="fa-solid ${isSaved ? 'fa-check text-green-400' : 'fa-plus'}"></i>
+                                </button>
+                                <button onclick="event.stopPropagation(); showToast('Liked title!');" class="w-7 h-7 border border-gray-400 hover:border-white text-white rounded-full flex items-center justify-center text-xs transition">
+                                    <i class="fa-regular fa-thumbs-up"></i>
+                                </button>
+                            </div>
+                            <button onclick="event.stopPropagation(); openModal(${item.id});" class="w-7 h-7 border border-gray-400 hover:border-white text-white rounded-full flex items-center justify-center text-xs transition">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-1">
+                            <h4 class="text-xs md:text-sm font-bold text-white truncate">${item.title}</h4>
+                            <div class="flex items-center space-x-2 text-[10px] md:text-xs">
+                                <span class="text-green-400 font-semibold">${item.match}</span>
+                                <span class="border border-gray-500 text-gray-300 px-1 rounded">${item.rating}</span>
+                                <span class="text-gray-400">${item.duration}</span>
+                            </div>
+                            <div class="flex items-center space-x-1 text-[10px] text-gray-400">
+                                <span>${item.genre}</span>
+                                <span>•</span>
+                                <span>HD</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // CAROUSEL SCROLLING CONTROLLER
+        function scrollCarousel(button, direction) {
+            const track = button.parentElement.querySelector('.carousel-track');
+            const scrollAmount = track.clientWidth * 0.75;
+            track.scrollBy({
+                left: direction * scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+
+        // SEARCH & FILTERING LOGIC
+        function setupSearchFilter() {
+            const searchInput = document.getElementById('searchInput');
+            const searchToggleBtn = document.getElementById('searchToggleBtn');
+            const searchInnerIcon = document.getElementById('searchInnerIcon');
+
+            // Expand search input on click
+            searchToggleBtn.addEventListener('click', () => {
+                searchInput.classList.toggle('w-0');
+                searchInput.classList.toggle('w-48');
+                searchInput.classList.toggle('opacity-0');
+                searchInput.classList.toggle('opacity-100');
+                if (searchInput.classList.contains('w-48')) {
+                    searchInput.focus();
+                    searchInnerIcon.classList.remove('hidden');
+                } else {
+                    searchInnerIcon.classList.add('hidden');
+                }
+            });
+
+            // Live search filter
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                const filtered = MEDIA_DATABASE.filter(item => 
+                    item.title.toLowerCase().includes(query) ||
+                    item.genre.toLowerCase().includes(query) ||
+                    item.category.toLowerCase().includes(query) ||
+                    item.cast.toLowerCase().includes(query)
+                );
+                
+                const categoryHeader = document.getElementById('filterCategoryHeader');
+                const categoryTitle = document.getElementById('activeCategoryTitle');
+                
+                if (query.length > 0) {
+                    categoryHeader.classList.remove('hidden');
+                    categoryTitle.innerText = `Search Results for "${query}"`;
+                } else {
+                    categoryHeader.classList.add('hidden');
+                }
+                
+                renderMediaRows(filtered);
+            });
+        }
+
+        // GENRE AND TAB FILTERING
+        function filterByGenre(genre) {
+            const categoryHeader = document.getElementById('filterCategoryHeader');
+            const categoryTitle = document.getElementById('activeCategoryTitle');
+            const searchInput = document.getElementById('searchInput');
+
+            searchInput.value = '';
+
+            if (genre === 'All') {
+                categoryHeader.classList.add('hidden');
+                renderMediaRows(MEDIA_DATABASE);
+            } else if (genre === 'My List') {
+                categoryHeader.classList.remove('hidden');
+                categoryTitle.innerText = `My Saved List (${myListIds.size})`;
+                const savedItems = MEDIA_DATABASE.filter(item => myListIds.has(item.id));
+                renderMediaRows(savedItems);
+            } else {
+                categoryHeader.classList.remove('hidden');
+                categoryTitle.innerText = `${genre}`;
+                const filtered = MEDIA_DATABASE.filter(item => 
+                    item.category === genre || item.genre === genre
+                );
+                renderMediaRows(filtered);
+            }
+
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+        }
+
+        // MODAL DIALOG DISPLAY LOGIC
+        function openModal(id) {
+            const item = MEDIA_DATABASE.find(m => m.id === id);
+            if (!item) return;
+
+            activeModalId = id;
+            document.getElementById('modalTitle').innerText = item.title;
+            document.getElementById('modalImg').src = item.backdrop;
+            document.getElementById('modalMatch').innerText = item.match;
+            document.getElementById('modalYear').innerText = item.year;
+            document.getElementById('modalRating').innerText = item.rating;
+            document.getElementById('modalDuration').innerText = item.duration;
+            document.getElementById('modalDesc').innerText = item.description;
+            document.getElementById('modalCast').innerText = item.cast;
+            document.getElementById('modalGenre').innerText = item.genre;
+
+            // Update My List button state inside modal
+            updateModalListButton();
+
+            // Render Episodes Mock
+            const epContainer = document.getElementById('episodesContainer');
+            epContainer.innerHTML = [1, 2, 3].map(ep => `
+                <div class="flex items-center justify-between p-3 rounded bg-netflixDark/60 hover:bg-netflixGray/60 transition cursor-pointer group">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-gray-500 font-bold text-base w-4">${ep}</span>
+                        <div class="w-20 h-12 bg-netflixGray rounded overflow-hidden flex-none relative">
+                            <img src="${item.poster}" class="w-full h-full object-cover">
+                            <i class="fa-solid fa-play absolute inset-0 m-auto w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-semibold text-white group-hover:text-netflixRed transition">Episode ${ep}: The Beginning</h4>
+                            <p class="text-xs text-gray-400 line-clamp-1">Tensions rise as the crew discovers unexpected findings during initial deep sweeps.</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-400">45m</span>
+                </div>
+            `).join('');
+
+            const modal = document.getElementById('detailModal');
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('detailModal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            activeModalId = null;
+        }
+
+        // MY-LIST TOGGLE SYSTEM
+        function toggleMyList(id) {
+            if (myListIds.has(id)) {
+                myListIds.delete(id);
+                showToast("Removed from My List");
+            } else {
+                myListIds.add(id);
+                showToast("Added to My List");
+            }
+            updateMyListBadge();
+            renderMediaRows(MEDIA_DATABASE);
+            if (activeModalId === id) {
+                updateModalListButton();
+            }
+        }
+
+        function toggleMyListFromModal() {
+            if (activeModalId !== null) {
+                toggleMyList(activeModalId);
+            }
+        }
+
+        function updateModalListButton() {
+            const icon = document.getElementById('modalListIcon');
+            if (myListIds.has(activeModalId)) {
+                icon.className = "fa-solid fa-check text-green-400";
+            } else {
+                icon.className = "fa-solid fa-plus";
+            }
+        }
+
+        function updateMyListBadge() {
+            const badge = document.getElementById('myListBadge');
+            if (myListIds.size > 0) {
+                badge.innerText = myListIds.size;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // TOAST NOTIFICATION UTILITY
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.innerText = message;
+            
+            toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+            }, 2500);
+        }
+
+        // HERO TRAILER ACTION SIMULATION
+        function playHeroTrailer() {
+            showToast("Playing 'Interstellar Odyssey' Trailer...");
+        }
+
+        function playModalVideo() {
+            showToast("Starting Video Stream...");
+        }
+    </script>
+</body>
+</html>
